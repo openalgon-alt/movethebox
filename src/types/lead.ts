@@ -9,6 +9,7 @@ export interface Lead {
   status: LeadStatus;
   assigned_to: string | null;
   next_follow_up_date: string | null;
+  last_follow_up_at: string | null;
   notes: string | null;
   metadata: Record<string, any> | null;
   created_at: string;

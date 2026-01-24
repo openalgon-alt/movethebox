@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -20,6 +21,9 @@ import {
 } from '@/components/ui/dialog';
 import { Lead, LeadFormData, LEAD_STATUSES } from '@/types/lead';
 import { useCreateLead, useUpdateLead } from '@/hooks/useLeads';
+import { calculateNextFollowUpDate } from '@/lib/settings';
+import { useUser } from '@/components/auth/UserContext';
+import { toast } from 'sonner';
 
 const leadSchema = z.object({
   name: z.string().min(1, 'Name is required').max(100),
@@ -29,16 +33,11 @@ const leadSchema = z.object({
   status: z.enum(['New', 'Contacted', 'Follow-up', 'Closed', 'Lost']),
   assigned_to: z.string().max(100).optional().or(z.literal('')),
   next_follow_up_date: z.string().optional().or(z.literal('')),
-  notes: z.string().max(2000).optional().or(z.literal('')),
-}).superRefine((data, ctx) => {
-  if (data.status !== 'Closed' && data.status !== 'Lost' && !data.next_follow_up_date) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: "Follow-up date is required for active leads",
-      path: ["next_follow_up_date"],
-    });
-  }
+  notes: z.string().optional().or(z.literal('')),
+  new_note: z.string().optional(),
 });
+
+type ExtendedLeadFormData = z.infer<typeof leadSchema>;
 
 interface LeadFormProps {
   open: boolean;
@@ -49,6 +48,7 @@ interface LeadFormProps {
 export function LeadForm({ open, onOpenChange, lead }: LeadFormProps) {
   const createLead = useCreateLead();
   const updateLead = useUpdateLead();
+  const { user, members } = useUser();
   const isEditing = !!lead;
 
   const {
@@ -58,28 +58,105 @@ export function LeadForm({ open, onOpenChange, lead }: LeadFormProps) {
     watch,
     reset,
     formState: { errors, isSubmitting },
-  } = useForm<LeadFormData>({
+  } = useForm<ExtendedLeadFormData>({
     resolver: zodResolver(leadSchema),
     defaultValues: {
-      name: lead?.name || '',
-      phone: lead?.phone || '',
-      email: lead?.email || '',
-      source: lead?.source || '',
-      status: lead?.status || 'New',
-      assigned_to: lead?.assigned_to || '',
-      next_follow_up_date: lead?.next_follow_up_date || '',
-      notes: lead?.notes || '',
+      name: '',
+      phone: '',
+      email: '',
+      source: '',
+      status: 'New',
+      assigned_to: '',
+      next_follow_up_date: '',
+      notes: '',
+      new_note: '',
     },
   });
 
+  useEffect(() => {
+    if (open) {
+      if (lead) {
+        reset({
+          name: lead.name,
+          phone: lead.phone || '',
+          email: lead.email || '',
+          source: lead.source || '',
+          status: lead.status,
+          assigned_to: lead.assigned_to || '',
+          next_follow_up_date: lead.next_follow_up_date || '',
+          notes: lead.notes || '',
+          new_note: '',
+        });
+      } else {
+        reset({
+          name: '',
+          phone: '',
+          email: '',
+          source: '',
+          status: 'New',
+          assigned_to: user ? user.name : '',
+          next_follow_up_date: calculateNextFollowUpDate(),
+          notes: '',
+          new_note: '',
+        });
+      }
+    }
+  }, [open, lead, reset, user]);
+
   const status = watch('status');
 
-  const onSubmit = async (data: LeadFormData) => {
+  const onSubmit = async (data: ExtendedLeadFormData) => {
+    // Validation Rules
+    if (isEditing && user?.role !== 'admin') {
+      if (!data.new_note?.trim()) {
+        toast.error("You must add a note describing the interaction.");
+        return;
+      }
+
+      const isClosedOrLost = data.status === 'Closed' || data.status === 'Lost';
+
+      if (!isClosedOrLost && !data.next_follow_up_date) {
+        toast.error("Next follow-up date is required for active leads.");
+        return;
+      }
+
+      if (data.status === 'Closed' && !data.new_note.trim()) {
+        toast.error("Closing a lead requires a note.");
+        return;
+      }
+
+      if (data.status === 'Lost' && !data.new_note.trim()) {
+        toast.error("Marking a lead as Lost requires a reason in notes.");
+        return;
+      }
+    }
+
     try {
+      let finalNotes = data.notes || '';
+      if (data.new_note?.trim()) {
+        const timestamp = new Date().toLocaleString();
+        const noteEntry = `\n[${timestamp}] ${data.new_note}`;
+        finalNotes = finalNotes ? finalNotes + noteEntry : noteEntry.trim();
+      }
+
+      const submissionData = {
+        name: data.name,
+        phone: data.phone || '',
+        email: data.email || '',
+        source: data.source || '',
+        status: data.status,
+        assigned_to: data.assigned_to || '',
+        next_follow_up_date: data.next_follow_up_date || '',
+        notes: finalNotes,
+      };
+
       if (isEditing && lead) {
-        await updateLead.mutateAsync({ ...data, id: lead.id });
+        await updateLead.mutateAsync({
+          ...submissionData,
+          id: lead.id
+        });
       } else {
-        await createLead.mutateAsync(data);
+        await createLead.mutateAsync(submissionData);
       }
       reset();
       onOpenChange(false);
@@ -97,10 +174,10 @@ export function LeadForm({ open, onOpenChange, lead }: LeadFormProps) {
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-lg font-semibold">
-            {isEditing ? 'Edit Lead' : 'Add New Lead'}
+            {isEditing ? 'Update Lead' : 'Add New Lead'}
           </DialogTitle>
         </DialogHeader>
 
@@ -155,11 +232,31 @@ export function LeadForm({ open, onOpenChange, lead }: LeadFormProps) {
             </div>
             <div className="space-y-2">
               <Label htmlFor="assigned_to">Assigned To</Label>
-              <Input
-                id="assigned_to"
-                placeholder="Assignee name"
-                {...register('assigned_to')}
-              />
+              {user?.role === 'salesperson' ? (
+                <Input
+                  id="assigned_to"
+                  {...register('assigned_to')}
+                  disabled
+                  className="bg-muted"
+                />
+              ) : (
+                <Select
+                  value={watch('assigned_to') || 'unassigned'}
+                  onValueChange={(value) => setValue('assigned_to', value === 'unassigned' ? '' : value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Unassigned" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="unassigned">Unassigned</SelectItem>
+                    {members?.map((member) => (
+                      <SelectItem key={member} value={member}>
+                        {member}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
           </div>
 
@@ -168,7 +265,7 @@ export function LeadForm({ open, onOpenChange, lead }: LeadFormProps) {
               <Label htmlFor="status">Status</Label>
               <Select
                 value={status}
-                onValueChange={(value) => setValue('status', value as LeadFormData['status'])}
+                onValueChange={(value) => setValue('status', value as any)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select status" />
@@ -183,7 +280,10 @@ export function LeadForm({ open, onOpenChange, lead }: LeadFormProps) {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="next_follow_up_date">Next Follow-up</Label>
+              <Label htmlFor="next_follow_up_date">
+                Next Follow-up
+                {(status !== 'Closed' && status !== 'Lost') && <span className="text-destructive ml-1">*</span>}
+              </Label>
               <Input
                 id="next_follow_up_date"
                 type="date"
@@ -192,13 +292,34 @@ export function LeadForm({ open, onOpenChange, lead }: LeadFormProps) {
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="notes">Notes</Label>
+          {/* New Note Field - CRITICAL for Phase 3 */}
+          <div className="space-y-2 bg-muted/30 p-3 rounded-md border border-dashed border-primary/50">
+            <Label htmlFor="new_note" className="text-primary font-medium">
+              Interaction Note {isEditing && <span className="text-destructive">*</span>}
+            </Label>
+            <Textarea
+              id="new_note"
+              placeholder={isEditing ? "Describe the interaction (Required to save)" : "Initial notes..."}
+              rows={3}
+              {...register('new_note')}
+              className="bg-background"
+            />
+            {isEditing && (
+              <p className="text-xs text-muted-foreground">
+                You must add a note to update the lead.
+              </p>
+            )}
+          </div>
+
+          {/* Legacy/History Notes (Read Only in Edit Mode?) - keeping editable for now but pushed down */}
+          <div className="space-y-2 opacity-80">
+            <Label htmlFor="notes">History / Previous Notes</Label>
             <Textarea
               id="notes"
-              placeholder="Add any notes about this lead..."
+              placeholder="Previous notes code..."
               rows={3}
               {...register('notes')}
+              className="bg-muted"
             />
           </div>
 

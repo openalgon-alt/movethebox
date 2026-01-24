@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Lead } from '@/types/lead';
 import { getOverdueLeads } from '@/lib/leads';
 import { toast } from 'sonner';
+import { getFollowUpSettings } from '@/lib/settings';
 
 export function useDailyFollowUp(leads: Lead[]) {
   useEffect(() => {
@@ -15,8 +16,12 @@ export function useDailyFollowUp(leads: Lead[]) {
         return; // Already checked today
       }
 
+      if (!getFollowUpSettings().enableDailyReminder) {
+        return;
+      }
+
       const overdueLeads = getOverdueLeads(leads);
-      
+
       if (overdueLeads.length > 0) {
         toast.message('Daily Follow-up Reminder', {
           description: `You have ${overdueLeads.length} leads pending follow-up today.`,

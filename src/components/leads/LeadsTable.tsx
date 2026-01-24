@@ -25,15 +25,16 @@ import {
 import { StatusBadge } from './StatusBadge';
 import { Lead, LeadStatus, LEAD_STATUSES } from '@/types/lead';
 import { useDeleteLead } from '@/hooks/useLeads';
-import { 
-  Search, 
-  ChevronUp, 
-  ChevronDown, 
-  MoreHorizontal, 
-  Pencil, 
+import {
+  Search,
+  ChevronUp,
+  ChevronDown,
+  MoreHorizontal,
+  Pencil,
   Trash2,
   Users,
-  AlertCircle
+  AlertCircle,
+  CalendarClock
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { isLeadOverdue } from '@/lib/leads';
@@ -53,6 +54,8 @@ interface LeadsTableProps {
   leads: Lead[];
   isLoading: boolean;
   onEdit: (lead: Lead) => void;
+  onViewDetails: (lead: Lead) => void;
+  onQuickFollowUp: (lead: Lead) => void;
   initialSortField?: SortField;
   initialSortDirection?: SortDirection;
 }
@@ -60,12 +63,14 @@ interface LeadsTableProps {
 type SortField = 'next_follow_up_date' | 'created_at' | 'name';
 type SortDirection = 'asc' | 'desc';
 
-export function LeadsTable({ 
-  leads, 
-  isLoading, 
-  onEdit, 
-  initialSortField = 'created_at', 
-  initialSortDirection = 'desc' 
+export function LeadsTable({
+  leads,
+  isLoading,
+  onEdit,
+  onViewDetails,
+  onQuickFollowUp,
+  initialSortField = 'created_at',
+  initialSortDirection = 'desc'
 }: LeadsTableProps) {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<LeadStatus | 'all'>('all');
@@ -118,8 +123,8 @@ export function LeadsTable({
 
   const SortIcon = ({ field }: { field: SortField }) => {
     if (sortField !== field) return null;
-    return sortDirection === 'asc' ? 
-      <ChevronUp className="h-4 w-4 inline ml-1" /> : 
+    return sortDirection === 'asc' ?
+      <ChevronUp className="h-4 w-4 inline ml-1" /> :
       <ChevronDown className="h-4 w-4 inline ml-1" />;
   };
 
@@ -187,8 +192,8 @@ export function LeadsTable({
             <Users className="h-12 w-12 mb-4 opacity-50" />
             <p className="text-lg font-medium mb-1">No leads found</p>
             <p className="text-sm">
-              {search || statusFilter !== 'all' 
-                ? 'Try adjusting your filters' 
+              {search || statusFilter !== 'all'
+                ? 'Try adjusting your filters'
                 : 'Add your first lead to get started'}
             </p>
           </div>
@@ -196,7 +201,7 @@ export function LeadsTable({
           <Table>
             <TableHeader>
               <TableRow className="bg-table-header hover:bg-table-header">
-                <TableHead 
+                <TableHead
                   className="cursor-pointer select-none"
                   onClick={() => handleSort('name')}
                 >
@@ -207,13 +212,13 @@ export function LeadsTable({
                 <TableHead>Source</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Assigned To</TableHead>
-                <TableHead 
+                <TableHead
                   className="cursor-pointer select-none"
                   onClick={() => handleSort('next_follow_up_date')}
                 >
                   Follow-up <SortIcon field="next_follow_up_date" />
                 </TableHead>
-                <TableHead 
+                <TableHead
                   className="cursor-pointer select-none"
                   onClick={() => handleSort('created_at')}
                 >
@@ -224,11 +229,33 @@ export function LeadsTable({
             </TableHeader>
             <TableBody>
               {filteredAndSortedLeads.map((lead) => (
-                <TableRow 
-                  key={lead.id} 
+                <TableRow
+                  key={lead.id}
                   className="animate-fade-in hover:bg-table-hover transition-colors"
                 >
-                  <TableCell className="font-medium">{lead.name}</TableCell>
+                  <TableCell className="font-medium">
+                    <div className="flex items-center justify-between gap-2 max-w-[200px]">
+                      <span
+                        className="truncate cursor-pointer hover:underline hover:text-primary transition-colors"
+                        title="View Profile"
+                        onClick={() => onViewDetails(lead)}
+                      >
+                        {lead.name}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 shrink-0"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onQuickFollowUp(lead);
+                        }}
+                        title="Quick Follow-up"
+                      >
+                        <CalendarClock className="h-3.5 w-3.5 text-muted-foreground hover:text-primary" />
+                      </Button>
+                    </div>
+                  </TableCell>
                   <TableCell className="text-muted-foreground">
                     {lead.phone || '—'}
                   </TableCell>
@@ -246,8 +273,8 @@ export function LeadsTable({
                   </TableCell>
                   <TableCell className={cn("text-muted-foreground", isLeadOverdue(lead) && "text-destructive font-medium")}>
                     <div className="flex items-center gap-2">
-                       {isLeadOverdue(lead) && <AlertCircle className="h-4 w-4" />}
-                       {formatDate(lead.next_follow_up_date)}
+                      {isLeadOverdue(lead) && <AlertCircle className="h-4 w-4" />}
+                      {formatDate(lead.next_follow_up_date)}
                     </div>
                   </TableCell>
                   <TableCell className="text-muted-foreground">
@@ -261,11 +288,15 @@ export function LeadsTable({
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => onQuickFollowUp(lead)}>
+                          <CalendarClock className="h-4 w-4 mr-2" />
+                          Quick Follow-up
+                        </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => onEdit(lead)}>
                           <Pencil className="h-4 w-4 mr-2" />
                           Edit
                         </DropdownMenuItem>
-                        <DropdownMenuItem 
+                        <DropdownMenuItem
                           className="text-destructive focus:text-destructive"
                           onClick={() => setDeleteId(lead.id)}
                         >

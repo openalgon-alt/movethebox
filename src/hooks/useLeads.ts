@@ -40,10 +40,11 @@ export function useLeads() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      
+
       return (data || []).map(lead => ({
         ...lead,
         status: lead.status as LeadStatus,
+        last_follow_up_at: (lead as any).last_follow_up_at || null, // Handle potential undefined from DB
         metadata: (lead as any).metadata || null
       }));
     },
@@ -106,6 +107,10 @@ export function useUpdateLead() {
           status: lead.status,
           assigned_to: lead.assigned_to || null,
           next_follow_up_date: lead.next_follow_up_date || null,
+          metadata: {
+            ...((lead as any).metadata || {}),
+            last_follow_up_at: new Date().toISOString()
+          },
           notes: lead.notes || null,
         })
         .eq('id', id)
@@ -155,7 +160,7 @@ export function useBulkCreateLeads() {
       // Validate all leads first
       for (const lead of leads) {
         if (lead.status && !validateLeadFollowUp(lead.status as LeadStatus, lead.next_follow_up_date)) {
-           throw new Error(`Lead "${lead.name}" requires a follow-up date for status "${lead.status}"`);
+          throw new Error(`Lead "${lead.name}" requires a follow-up date for status "${lead.status}"`);
         }
       }
 
