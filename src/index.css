@@ -1,0 +1,169 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Lead CRM Design System - Clean, professional, inbox-style */
+
+@layer base {
+  :root {
+    --background: 210 20% 98%;
+    --foreground: 220 20% 10%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 220 20% 10%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 20% 10%;
+
+    --primary: 215 80% 50%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 220 20% 20%;
+
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 10% 46%;
+
+    --accent: 215 80% 96%;
+    --accent-foreground: 215 80% 40%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 215 80% 50%;
+
+    --radius: 0.5rem;
+
+    /* Status colors */
+    --status-new: 215 80% 50%;
+    --status-new-bg: 215 80% 96%;
+    --status-contacted: 262 83% 58%;
+    --status-contacted-bg: 262 83% 96%;
+    --status-follow-up: 38 92% 50%;
+    --status-follow-up-bg: 38 92% 95%;
+    --status-closed: 142 71% 45%;
+    --status-closed-bg: 142 71% 95%;
+    --status-lost: 0 72% 51%;
+    --status-lost-bg: 0 72% 96%;
+
+    /* Table styles */
+    --table-header: 220 14% 96%;
+    --table-row-hover: 215 80% 98%;
+    --table-border: 220 13% 93%;
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    --background: 220 20% 8%;
+    --foreground: 210 20% 98%;
+
+    --card: 220 20% 10%;
+    --card-foreground: 210 20% 98%;
+
+    --popover: 220 20% 10%;
+    --popover-foreground: 210 20% 98%;
+
+    --primary: 215 80% 55%;
+    --primary-foreground: 220 20% 5%;
+
+    --secondary: 220 14% 15%;
+    --secondary-foreground: 210 20% 90%;
+
+    --muted: 220 14% 15%;
+    --muted-foreground: 220 10% 60%;
+
+    --accent: 215 80% 20%;
+    --accent-foreground: 215 80% 70%;
+
+    --destructive: 0 62% 40%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 14% 18%;
+    --input: 220 14% 18%;
+    --ring: 215 80% 55%;
+
+    --status-new: 215 80% 55%;
+    --status-new-bg: 215 80% 15%;
+    --status-contacted: 262 83% 65%;
+    --status-contacted-bg: 262 83% 15%;
+    --status-follow-up: 38 92% 55%;
+    --status-follow-up-bg: 38 92% 15%;
+    --status-closed: 142 71% 50%;
+    --status-closed-bg: 142 71% 15%;
+    --status-lost: 0 72% 55%;
+    --status-lost-bg: 0 72% 15%;
+
+    --table-header: 220 14% 12%;
+    --table-row-hover: 215 80% 12%;
+    --table-border: 220 14% 16%;
+
+    --sidebar-background: 220 20% 6%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 215 80% 55%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 14% 12%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 220 14% 16%;
+    --sidebar-ring: 215 80% 55%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "cv11", "ss01";
+  }
+}
+
+@layer components {
+  .status-badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+
+  .status-new {
+    background-color: hsl(var(--status-new-bg));
+    color: hsl(var(--status-new));
+  }
+
+  .status-contacted {
+    background-color: hsl(var(--status-contacted-bg));
+    color: hsl(var(--status-contacted));
+  }
+
+  .status-follow-up {
+    background-color: hsl(var(--status-follow-up-bg));
+    color: hsl(var(--status-follow-up));
+  }
+
+  .status-closed {
+    background-color: hsl(var(--status-closed-bg));
+    color: hsl(var(--status-closed));
+  }
+
+  .status-lost {
+    background-color: hsl(var(--status-lost-bg));
+    color: hsl(var(--status-lost));
+  }
+
+  .table-container {
+    @apply bg-card rounded-lg border shadow-sm overflow-hidden;
+  }
+
+  .empty-state {
+    @apply flex flex-col items-center justify-center py-16 text-muted-foreground;
+  }
+}
