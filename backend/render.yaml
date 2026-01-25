@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: movethebox-backend
+    env: node
+    plan: free
+    region: singapore # or ohio, frankfurt etc.
+    rootDir: backend
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: DB_HOST
+        sync: false
+      - key: DB_PORT
+        value: 6543
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: DB_NAME
+        value: postgres
