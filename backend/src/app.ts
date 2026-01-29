@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import routes from './routes';
+import userRoutes from './routes/users';
 
 const app = express();
 
@@ -12,6 +13,7 @@ app.use(express.json());
 
 // Routes
 app.use('/api', routes);
+app.use('/api/users', userRoutes);
 
 // Health Check
 app.get('/health', (req, res) => {

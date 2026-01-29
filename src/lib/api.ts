@@ -8,7 +8,7 @@ const API_URL = 'http://localhost:3000/api';
 const getTenantId = () => {
     let tid = localStorage.getItem('demo_tenant_id');
     if (!tid) {
-        tid = '00000000-0000-0000-0000-000000000000'; // Fallback / Invalid UUID
+        tid = 'e9ddf5f0-a591-49bb-8b82-a50ae1770426'; // Seeded Tenant ID
         console.warn('Using Placeholder Tenant ID. Please Configure Correctly.');
     }
     return tid;

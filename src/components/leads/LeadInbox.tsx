@@ -13,7 +13,6 @@ import { Plus, Upload, Inbox, CalendarClock, ListFilter, Settings, LogOut, User 
 
 import { QuickFollowUpDialog } from './QuickFollowUpDialog';
 import { LeadDetailsDialog } from './LeadDetailsDialog';
-import { LoginDialog } from '@/components/auth/LoginDialog';
 import { useUser } from '@/components/auth/UserContext';
 import {
   DropdownMenu,
@@ -454,7 +453,6 @@ export function LeadInbox() {
         onOpenChange={setIsTeamSettingsOpen}
       />
 
-      <LoginDialog />
 
       <QuickFollowUpDialog
         open={isQuickFollowUpOpen}

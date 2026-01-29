@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
     Dialog,
     DialogContent,
@@ -21,6 +21,7 @@ import {
 import { useUser, TeamMember } from '@/components/auth/UserContext';
 import { Plus, Trash2, Users, ArrowLeft, Save, Mail, Key, Hash, Briefcase } from 'lucide-react';
 import { toast } from 'sonner';
+import { api } from '@/lib/api';
 
 interface TeamSettingsDialogProps {
     open: boolean;
@@ -28,18 +29,40 @@ interface TeamSettingsDialogProps {
 }
 
 export function TeamSettingsDialog({ open, onOpenChange }: TeamSettingsDialogProps) {
-    const { members, addMember, removeMember } = useUser();
+    const { user } = useUser();
     const [isAdding, setIsAdding] = useState(false);
+    const [members, setMembers] = useState<TeamMember[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
 
     // Form State
     const [formData, setFormData] = useState<Partial<TeamMember>>({
         name: '',
         designation: '',
-        id: '',
+        id: '', // Employee ID
         email: '',
         password: '',
         role: 'salesperson' // Default role
     });
+
+    // Fetch Members
+    const fetchMembers = async () => {
+        try {
+            setIsLoading(true);
+            const res = await api.get('/users');
+            setMembers(res.data);
+        } catch (error) {
+            console.error('Failed to fetch members', error);
+            // toast.error('Failed to load team members'); 
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        if (open && user?.role === 'admin') {
+            fetchMembers();
+        }
+    }, [open, user]);
 
     const resetForm = () => {
         setFormData({
@@ -53,7 +76,7 @@ export function TeamSettingsDialog({ open, onOpenChange }: TeamSettingsDialogPro
         setIsAdding(false);
     };
 
-    const handleAdd = (e: React.FormEvent) => {
+    const handleAdd = async (e: React.FormEvent) => {
         e.preventDefault();
 
         // Basic Validation
@@ -62,30 +85,34 @@ export function TeamSettingsDialog({ open, onOpenChange }: TeamSettingsDialogPro
             return;
         }
 
-        // Check for duplicate ID or Email
-        if (members.some(m => m.id === formData.id)) {
-            toast.error("A member with this ID already exists");
-            return;
+        try {
+            await api.post('/users', {
+                name: formData.name,
+                designation: formData.designation,
+                id: formData.id,
+                email: formData.email,
+                password: formData.password
+            });
+
+            toast.success("Team member created successfully");
+            resetForm();
+            fetchMembers();
+        } catch (error: any) {
+            console.error('Add Member Error', error);
+            toast.error(error.response?.data?.error || "Failed to create user");
         }
-
-        // Add Member
-        addMember({
-            id: formData.id,
-            name: formData.name,
-            designation: formData.designation || 'Salesperson',
-            email: formData.email,
-            password: formData.password,
-            role: formData.role || 'salesperson'
-        } as TeamMember);
-
-        toast.success("Team member added successfully");
-        resetForm();
     };
 
-    const handleDelete = (id: string, name: string) => {
+    const handleDelete = async (userId: string, name: string) => {
         if (confirm(`Are you sure you want to remove ${name} from the team?`)) {
-            removeMember(id);
-            toast.success("Member removed");
+            try {
+                await api.delete(`/users/${userId}`);
+                toast.success("Member removed");
+                fetchMembers();
+            } catch (error: any) {
+                console.error('Delete Member Error', error);
+                toast.error("Failed to remove member");
+            }
         }
     };
 
@@ -101,7 +128,7 @@ export function TeamSettingsDialog({ open, onOpenChange }: TeamSettingsDialogPro
                         Team Management
                     </DialogTitle>
                     <DialogDescription>
-                        Manage your team members, their access, and details.
+                        Manage your team members and their access.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -195,7 +222,7 @@ export function TeamSettingsDialog({ open, onOpenChange }: TeamSettingsDialogPro
                                     <Button type="button" variant="outline" onClick={() => setIsAdding(false)} className="mr-2">Cancel</Button>
                                     <Button type="submit">
                                         <Save className="h-4 w-4 mr-2" />
-                                        Save Member
+                                        Create User
                                     </Button>
                                 </div>
                             </form>
@@ -217,14 +244,20 @@ export function TeamSettingsDialog({ open, onOpenChange }: TeamSettingsDialogPro
                                     <TableHeader>
                                         <TableRow>
                                             <TableHead>Name</TableHead>
-                                            <TableHead>ID</TableHead>
+                                            <TableHead>Role</TableHead>
                                             <TableHead>Designation</TableHead>
                                             <TableHead>Email</TableHead>
                                             <TableHead className="w-[80px]"></TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {members.length === 0 ? (
+                                        {isLoading ? (
+                                            <TableRow>
+                                                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                                                    Loading team...
+                                                </TableCell>
+                                            </TableRow>
+                                        ) : members.length === 0 ? (
                                             <TableRow>
                                                 <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                                                     No team members found. Add one to get started.
@@ -234,7 +267,7 @@ export function TeamSettingsDialog({ open, onOpenChange }: TeamSettingsDialogPro
                                             members.map((member) => (
                                                 <TableRow key={member.id}>
                                                     <TableCell className="font-medium">{member.name}</TableCell>
-                                                    <TableCell>{member.id}</TableCell>
+                                                    <TableCell className="capitalize">{member.role}</TableCell>
                                                     <TableCell>{member.designation}</TableCell>
                                                     <TableCell>{member.email}</TableCell>
                                                     <TableCell>

@@ -168,6 +168,19 @@ export function QuickFollowUpDialog({ open, onOpenChange, lead }: QuickFollowUpD
                 </DialogHeader>
 
                 <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 pt-4">
+                    <div className="flex justify-end gap-3 pb-2 border-b mb-4">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => onOpenChange(false)}
+                        >
+                            Cancel
+                        </Button>
+                        <Button type="submit" disabled={isSubmitting}>
+                            {isSubmitting ? 'Saving...' : 'Save'}
+                        </Button>
+                    </div>
+
                     {user?.role === 'admin' && (
                         <div className="space-y-2">
                             <Label>Assignee</Label>
@@ -358,18 +371,6 @@ export function QuickFollowUpDialog({ open, onOpenChange, lead }: QuickFollowUpD
 
 
 
-                    <div className="flex justify-end gap-3 pt-2">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => onOpenChange(false)}
-                        >
-                            Cancel
-                        </Button>
-                        <Button type="submit" disabled={isSubmitting}>
-                            {isSubmitting ? 'Saving...' : 'Save'}
-                        </Button>
-                    </div>
                 </form >
             </DialogContent >
         </Dialog >

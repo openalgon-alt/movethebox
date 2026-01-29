@@ -16,6 +16,44 @@ import FollowUpPolicy from "./pages/FollowUpPolicy";
 
 const queryClient = new QueryClient();
 
+import { Navigate, Outlet } from "react-router-dom";
+import { useUser } from "./components/auth/UserContext";
+import Auth from "./pages/Auth";
+import AdminDashboard from "./pages/AdminDashboard";
+import SalesDashboard from "./pages/SalesDashboard";
+import RoleBasedRedirect from "./components/auth/RoleBasedRedirect";
+
+const ProtectedRoute = () => {
+  const { user, isLoading } = useUser();
+
+  if (isLoading) {
+    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  }
+
+  if (!user) return <Navigate to="/auth" replace />;
+  return <Outlet />;
+};
+
+const AppRoutes = () => {
+  return (
+    <Routes>
+      <Route path="/auth" element={<Auth />} />
+      <Route element={<ProtectedRoute />}>
+        <Route path="/" element={<RoleBasedRedirect />} />
+        <Route path="/admin-dashboard" element={<AdminDashboard />} />
+        <Route path="/sales-dashboard" element={<SalesDashboard />} />
+        <Route path="/performance" element={<PerformanceDashboard />} />
+        <Route path="/performance/calendar" element={<TeamCalendar />} />
+        <Route path="/performance/:name" element={<SalespersonDetails />} />
+        <Route path="/incentives" element={<IncentivesDashboard />} />
+        <Route path="/settings/follow-up-policy" element={<FollowUpPolicy />} />
+        {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+        <Route path="*" element={<NotFound />} />
+      </Route>
+    </Routes>
+  );
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -24,16 +62,7 @@ const App = () => (
           <Toaster />
           <Sonner />
           <BrowserRouter>
-            <Routes>
-              <Route path="/" element={<Index />} />
-              <Route path="/performance" element={<PerformanceDashboard />} />
-              <Route path="/performance/calendar" element={<TeamCalendar />} />
-              <Route path="/performance/:name" element={<SalespersonDetails />} />
-              <Route path="/incentives" element={<IncentivesDashboard />} />
-              <Route path="/settings/follow-up-policy" element={<FollowUpPolicy />} />
-              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
+            <AppRoutes />
           </BrowserRouter>
         </AddOnProvider>
       </UserProvider>

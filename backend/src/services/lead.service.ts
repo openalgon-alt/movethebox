@@ -24,18 +24,25 @@ export class LeadService {
                          assigned_to = COALESCE($2, assigned_to),
                          next_follow_up_date = COALESCE($3, next_follow_up_date),
                          metadata = COALESCE($4, metadata),
+                         contact_name = COALESCE($5, contact_name),
                          updated_at = NOW()
-                     WHERE id = $5 AND tenant_id = $6
+                     WHERE id = $6 AND tenant_id = $7
                      RETURNING *`,
-                    [data.status, data.assigned_to, data.next_follow_up_date, data.metadata, leadId, tenantId]
+                    [data.status, data.assigned_to, data.next_follow_up_date, data.metadata, (data.contact_name || (data as any).name), leadId, tenantId]
                 );
             } else {
                 // Create
+                // Fix: 'leads' table has 'contact_name', not 'name'. Frontend sends 'name'.
+                const contactName = data.contact_name || (data as any).name || 'Unknown Lead';
+                const contactPhone = data.contact_phone || (data as any).phone || null;
+                const contactEmail = data.contact_email || (data as any).email || null;
+                const source = data.source || null;
+
                 leadResult = await client.query(
-                    `INSERT INTO leads (tenant_id, assigned_to, status, contact_name, metadata)
-                     VALUES ($1, $2, $3, $4, $5)
+                    `INSERT INTO leads (tenant_id, assigned_to, status, contact_name, contact_phone, contact_email, source, metadata)
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
                      RETURNING *`,
-                    [tenantId, data.assigned_to, data.status || 'New', data.contact_name, data.metadata || {}]
+                    [tenantId, data.assigned_to, data.status || 'New', contactName, contactPhone, contactEmail, source, data.metadata || {}]
                 );
                 leadId = leadResult.rows[0].id;
             }

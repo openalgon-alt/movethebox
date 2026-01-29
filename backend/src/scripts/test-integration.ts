@@ -13,7 +13,8 @@ async function runTest() {
         // 2. Create a Lead (this triggers DB access)
         console.log('\n2. Creating Test Lead...');
         const payload = {
-            name: "Integration Test User",
+            contact_name: "Integration Test User",
+            name: "Integration Test User", // For legacy/compatibility
             email: "test@integration.com",
             status: "New",
             // Metadata that triggers incentives!
@@ -24,7 +25,7 @@ async function runTest() {
         };
 
         const headers = {
-            'X-Tenant-ID': '00000000-0000-0000-0000-000000000000', // Placeholder or seed tenant
+            'X-Tenant-ID': 'e9ddf5f0-a591-49bb-8b82-a50ae1770426', // Seeded Tenant
             'X-User-Role': 'admin'
         };
 
