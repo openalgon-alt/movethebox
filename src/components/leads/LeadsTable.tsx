@@ -37,8 +37,8 @@ import {
   CalendarClock
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { isLeadOverdue } from '@/lib/leads';
-import { format, parseISO } from 'date-fns';
+import { isLeadOverdue, isLeadStale } from '@/lib/leads';
+import { format, parseISO, formatDistanceToNow } from 'date-fns';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -50,12 +50,16 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 
+import { Checkbox } from '@/components/ui/checkbox';
+
 interface LeadsTableProps {
   leads: Lead[];
   isLoading: boolean;
   onEdit: (lead: Lead) => void;
   onViewDetails: (lead: Lead) => void;
   onQuickFollowUp: (lead: Lead) => void;
+  selectedIds?: string[];
+  onSelectionChange?: (ids: string[]) => void;
   initialSortField?: SortField;
   initialSortDirection?: SortDirection;
 }
@@ -63,15 +67,26 @@ interface LeadsTableProps {
 type SortField = 'next_follow_up_date' | 'created_at' | 'name';
 type SortDirection = 'asc' | 'desc';
 
+import { useUser } from '@/components/auth/UserContext';
+import { useAddOns } from '@/components/settings/AddOnContext';
+import { useProducts } from '@/hooks/useProducts';
+
+// ...
+
 export function LeadsTable({
   leads,
   isLoading,
   onEdit,
   onViewDetails,
   onQuickFollowUp,
+  selectedIds = [],
+  onSelectionChange,
   initialSortField = 'created_at',
   initialSortDirection = 'desc'
 }: LeadsTableProps) {
+  const { user } = useUser();
+  const { isProductsEnabled } = useAddOns();
+  const { products } = useProducts();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<LeadStatus | 'all'>('all');
   const [sortField, setSortField] = useState<SortField>(initialSortField);
@@ -112,6 +127,24 @@ export function LeadsTable({
     return filtered;
   }, [leads, search, statusFilter, sortField, sortDirection]);
 
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      onSelectionChange?.(filteredAndSortedLeads.map(l => l.id));
+    } else {
+      onSelectionChange?.([]);
+    }
+  };
+
+  const handleSelectOne = (id: string, checked: boolean) => {
+    if (checked) {
+      onSelectionChange?.([...selectedIds, id]);
+    } else {
+      onSelectionChange?.(selectedIds.filter(sid => sid !== id));
+    }
+  };
+
+  // ... (rest of sorting/handling logic same)
+
   const handleSort = (field: SortField) => {
     if (sortField === field) {
       setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
@@ -139,6 +172,15 @@ export function LeadsTable({
     if (!dateStr) return '—';
     try {
       return format(parseISO(dateStr), 'MMM d, yyyy');
+    } catch {
+      return dateStr;
+    }
+  };
+
+  const formatRelativeTime = (dateStr: string | null) => {
+    if (!dateStr) return '—';
+    try {
+      return formatDistanceToNow(parseISO(dateStr), { addSuffix: true });
     } catch {
       return dateStr;
     }
@@ -201,6 +243,15 @@ export function LeadsTable({
           <Table>
             <TableHeader>
               <TableRow className="bg-table-header hover:bg-table-header">
+                {onSelectionChange && (
+                  <TableHead className="w-[40px]">
+                    <Checkbox
+                      checked={filteredAndSortedLeads.length > 0 && selectedIds.length === filteredAndSortedLeads.length}
+                      onCheckedChange={(checked) => handleSelectAll(checked as boolean)}
+                      aria-label="Select all"
+                    />
+                  </TableHead>
+                )}
                 <TableHead
                   className="cursor-pointer select-none"
                   onClick={() => handleSort('name')}
@@ -211,7 +262,9 @@ export function LeadsTable({
                 <TableHead>Email</TableHead>
                 <TableHead>Source</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Assigned To</TableHead>
+                {user?.role === 'admin' && (
+                  <TableHead>Assigned To</TableHead>
+                )}
                 <TableHead
                   className="cursor-pointer select-none"
                   onClick={() => handleSort('next_follow_up_date')}
@@ -222,8 +275,9 @@ export function LeadsTable({
                   className="cursor-pointer select-none"
                   onClick={() => handleSort('created_at')}
                 >
-                  Created <SortIcon field="created_at" />
+                  {isProductsEnabled ? 'Products' : <span>Created <SortIcon field="created_at" /></span>}
                 </TableHead>
+                <TableHead>Last Update</TableHead>
                 <TableHead className="w-[50px]"></TableHead>
               </TableRow>
             </TableHeader>
@@ -231,14 +285,30 @@ export function LeadsTable({
               {filteredAndSortedLeads.map((lead) => (
                 <TableRow
                   key={lead.id}
-                  className="animate-fade-in hover:bg-table-hover transition-colors"
+                  className={cn(
+                    "animate-fade-in hover:bg-table-hover transition-colors",
+                    isLeadStale(lead) && "bg-amber-50/50 dark:bg-amber-950/10 hover:bg-amber-100/50 dark:hover:bg-amber-900/20"
+                  )}
+                  onClick={() => onSelectionChange && handleSelectOne(lead.id, !selectedIds.includes(lead.id))}
                 >
+                  {onSelectionChange && (
+                    <TableCell className="w-[40px] px-2" onClick={(e) => e.stopPropagation()}>
+                      <Checkbox
+                        checked={selectedIds.includes(lead.id)}
+                        onCheckedChange={(checked) => handleSelectOne(lead.id, checked as boolean)}
+                        aria-label={`Select ${lead.name}`}
+                      />
+                    </TableCell>
+                  )}
                   <TableCell className="font-medium">
                     <div className="flex items-center justify-between gap-2 max-w-[200px]">
                       <span
                         className="truncate cursor-pointer hover:underline hover:text-primary transition-colors"
                         title="View Profile"
-                        onClick={() => onViewDetails(lead)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onViewDetails(lead);
+                        }}
                       >
                         {lead.name}
                       </span>
@@ -250,7 +320,7 @@ export function LeadsTable({
                           e.stopPropagation();
                           onQuickFollowUp(lead);
                         }}
-                        title="Quick Follow-up"
+                        title="Quick Action"
                       >
                         <CalendarClock className="h-3.5 w-3.5 text-muted-foreground hover:text-primary" />
                       </Button>
@@ -267,10 +337,17 @@ export function LeadsTable({
                   </TableCell>
                   <TableCell>
                     <StatusBadge status={lead.status} />
+                    {isLeadStale(lead) && (
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-300 ml-2">
+                        Stale
+                      </span>
+                    )}
                   </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {lead.assigned_to || '—'}
-                  </TableCell>
+                  {user?.role === 'admin' && (
+                    <TableCell className="text-muted-foreground">
+                      {lead.assigned_to || '—'}
+                    </TableCell>
+                  )}
                   <TableCell className={cn("text-muted-foreground", isLeadOverdue(lead) && "text-destructive font-medium")}>
                     <div className="flex items-center gap-2">
                       {isLeadOverdue(lead) && <AlertCircle className="h-4 w-4" />}
@@ -278,7 +355,25 @@ export function LeadsTable({
                     </div>
                   </TableCell>
                   <TableCell className="text-muted-foreground">
-                    {formatDate(lead.created_at)}
+                    {isProductsEnabled ? (
+                      <div className="flex flex-wrap gap-1">
+                        {(() => {
+                          const pIds = (lead.metadata as any)?.product_ids as string[] | undefined;
+                          const singleId = (lead.metadata as any)?.product_id as string | undefined; // Fallback
+                          const ids = pIds || (singleId ? [singleId] : []);
+
+                          if (ids.length === 0) return '—';
+
+                          const names = ids.map(id => products.find(p => p.id === id)?.name).filter(Boolean);
+                          return names.length > 0 ? names.join(', ') : '—';
+                        })()}
+                      </div>
+                    ) : (
+                      formatDate(lead.created_at)
+                    )}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground text-sm">
+                    {formatRelativeTime(lead.updated_at)}
                   </TableCell>
                   <TableCell>
                     <DropdownMenu>
@@ -290,7 +385,7 @@ export function LeadsTable({
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={() => onQuickFollowUp(lead)}>
                           <CalendarClock className="h-4 w-4 mr-2" />
-                          Quick Follow-up
+                          Quick Action
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => onEdit(lead)}>
                           <Pencil className="h-4 w-4 mr-2" />

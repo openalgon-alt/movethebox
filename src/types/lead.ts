@@ -26,6 +26,15 @@ export interface Connector {
   updated_at: string;
 }
 
+export interface Product {
+  id: string;
+  name: string;
+  price: number;
+  active: boolean;
+  incentive_percentage?: number;
+  is_incentive_customizable?: boolean;
+}
+
 export interface LeadFormData {
   name: string;
   phone: string;

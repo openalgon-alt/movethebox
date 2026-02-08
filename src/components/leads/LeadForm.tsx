@@ -24,6 +24,8 @@ import { useCreateLead, useUpdateLead } from '@/hooks/useLeads';
 import { calculateNextFollowUpDate } from '@/lib/settings';
 import { useUser } from '@/components/auth/UserContext';
 import { toast } from 'sonner';
+import { useAddOns } from '@/components/settings/AddOnContext';
+import { useProducts } from '@/hooks/useProducts';
 
 const leadSchema = z.object({
   name: z.string().min(1, 'Name is required').max(100),
@@ -35,6 +37,8 @@ const leadSchema = z.object({
   next_follow_up_date: z.string().optional().or(z.literal('')),
   notes: z.string().optional().or(z.literal('')),
   new_note: z.string().optional(),
+  product_ids: z.array(z.string()).optional(),
+  expected_value: z.string().optional(),
 });
 
 type ExtendedLeadFormData = z.infer<typeof leadSchema>;
@@ -49,6 +53,8 @@ export function LeadForm({ open, onOpenChange, lead }: LeadFormProps) {
   const createLead = useCreateLead();
   const updateLead = useUpdateLead();
   const { user, members } = useUser();
+  const { isPricingIncentivesEnabled } = useAddOns();
+  const { activeProducts } = useProducts();
   const isEditing = !!lead;
 
   const {
@@ -86,6 +92,8 @@ export function LeadForm({ open, onOpenChange, lead }: LeadFormProps) {
           next_follow_up_date: lead.next_follow_up_date || '',
           notes: lead.notes || '',
           new_note: '',
+          product_ids: lead.metadata?.product_ids || (lead.metadata?.product_id ? [lead.metadata.product_id] : []),
+          expected_value: lead.metadata?.expected_value ? String(lead.metadata.expected_value) : '',
         });
       } else {
         reset({
@@ -98,6 +106,8 @@ export function LeadForm({ open, onOpenChange, lead }: LeadFormProps) {
           next_follow_up_date: calculateNextFollowUpDate(),
           notes: '',
           new_note: '',
+          product_ids: [],
+          expected_value: '',
         });
       }
     }
@@ -107,6 +117,8 @@ export function LeadForm({ open, onOpenChange, lead }: LeadFormProps) {
 
   const onSubmit = async (data: ExtendedLeadFormData) => {
     // Validation Rules
+    // Validation Rules
+    // ADMIN EXEMPTION: Admins can update without notes.
     if (isEditing && user?.role !== 'admin') {
       if (!data.new_note?.trim()) {
         toast.error("You must add a note describing the interaction.");
@@ -148,6 +160,11 @@ export function LeadForm({ open, onOpenChange, lead }: LeadFormProps) {
         assigned_to: data.assigned_to || '',
         next_follow_up_date: data.next_follow_up_date || '',
         notes: finalNotes,
+        metadata: {
+          ...(lead?.metadata || {}),
+          product_ids: data.product_ids || [],
+          expected_value: data.expected_value ? parseFloat(data.expected_value) : 0
+        } as any
       };
 
       if (isEditing && lead) {
@@ -230,16 +247,9 @@ export function LeadForm({ open, onOpenChange, lead }: LeadFormProps) {
                 {...register('source')}
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="assigned_to">Assigned To</Label>
-              {user?.role === 'salesperson' ? (
-                <Input
-                  id="assigned_to"
-                  {...register('assigned_to')}
-                  disabled
-                  className="bg-muted"
-                />
-              ) : (
+            {user?.role === 'admin' && (
+              <div className="space-y-2">
+                <Label htmlFor="assigned_to">Assigned To</Label>
                 <Select
                   value={watch('assigned_to') || 'unassigned'}
                   onValueChange={(value) => setValue('assigned_to', value === 'unassigned' ? '' : value)}
@@ -250,15 +260,78 @@ export function LeadForm({ open, onOpenChange, lead }: LeadFormProps) {
                   <SelectContent>
                     <SelectItem value="unassigned">Unassigned</SelectItem>
                     {members?.map((member) => (
-                      <SelectItem key={member} value={member}>
-                        {member}
+                      <SelectItem key={member.id} value={member.name}>
+                        {member.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-              )}
-            </div>
+              </div>
+            )}
+
           </div>
+
+          {isPricingIncentivesEnabled && (
+            <div className="bg-muted/20 p-4 rounded-lg border space-y-4">
+              <h3 className="text-sm font-medium flex items-center gap-2">
+                Product & Value (Optional)
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-3 col-span-2">
+                  <Label>Products</Label>
+                  <div className="border rounded-md p-3 max-h-40 overflow-y-auto space-y-2">
+                    {activeProducts.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No active products found.</p>
+                    ) : (
+                      activeProducts.map((p) => {
+                        const currentIds = watch('product_ids') || [];
+                        const isSelected = currentIds.includes(p.id);
+
+                        return (
+                          <div key={p.id} className="flex items-center space-x-2">
+                            <input
+                              type="checkbox"
+                              id={`prod-${p.id}`}
+                              className="h-4 w-4 rounded border-primary text-primary focus:ring-primary"
+                              checked={isSelected}
+                              onChange={(e) => {
+                                const checked = e.target.checked;
+                                let newIds = checked
+                                  ? [...currentIds, p.id]
+                                  : currentIds.filter(id => id !== p.id);
+
+                                setValue('product_ids', newIds);
+
+                                // Auto-calc value
+                                const total = activeProducts
+                                  .filter(prod => newIds.includes(prod.id))
+                                  .reduce((sum, prod) => sum + prod.price, 0);
+
+                                setValue('expected_value', String(total));
+                              }}
+                            />
+                            <label htmlFor={`prod-${p.id}`} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer">
+                              {p.name} <span className="text-muted-foreground ml-1">(${p.price})</span>
+                              {p.incentive_percentage ? <span className="text-xs text-green-600 ml-1">({p.incentive_percentage}% Comm.)</span> : null}
+                            </label>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="expected_value">Expected Value ($)</Label>
+                  <Input
+                    id="expected_value"
+                    type="number"
+                    placeholder="0.00"
+                    {...register('expected_value')}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
